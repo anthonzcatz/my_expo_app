@@ -1,6 +1,7 @@
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -106,6 +107,12 @@ export default function LoginScreen() {
     } catch (e) {
       console.error('Login error:', e);
       const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred';
+      console.error('Error details:', {
+        message: errorMessage,
+        stack: e instanceof Error ? e.stack : 'No stack trace',
+        url: API_ENDPOINTS.LOGIN,
+        username: username
+      });
       
       // Fade back in on error
       Animated.parallel([
@@ -121,7 +128,7 @@ export default function LoginScreen() {
         }),
       ]).start();
       
-      Alert.alert('Network error', `Cannot connect to server: ${errorMessage}`);
+      Alert.alert('Network Error', `Cannot connect to server: ${errorMessage}\n\nURL: ${API_ENDPOINTS.LOGIN}`);
     } finally {
       setLoading(false);
     }
@@ -137,9 +144,9 @@ export default function LoginScreen() {
           transform: [{ scale: scaleAnim }, { translateY: slideAnim }]
         }
       ]}>
-        <Image 
-          source={require('@/assets/images/logo.png')} 
-          style={styles.logoImage} 
+        <Image
+          source={require('../assets/images/logo.png')}
+          style={styles.logoImage}
         />
       </Animated.View>
       

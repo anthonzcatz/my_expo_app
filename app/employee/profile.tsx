@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Alert, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function EmployeeProfile() {
   const insets = useSafeAreaInsets();
@@ -35,7 +35,17 @@ export default function EmployeeProfile() {
   );
 
   const handleEditProfile = () => {
-    Alert.alert('Edit Profile', 'Profile editing feature coming soon!');
+    try {
+      Alert.alert('Edit Profile', 'Profile editing feature coming soon!');
+    } catch (error) {
+      console.error('Failed to edit profile:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Profile edit error details:', {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+      });
+      Alert.alert('Network Error', `Cannot connect to server: ${errorMessage}`);
+    }
   };
 
   const handleChangePassword = () => {
@@ -43,11 +53,21 @@ export default function EmployeeProfile() {
   };
 
   const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => {
-      // simulate fetch profile
-      setRefreshing(false);
-    }, 1200);
+    try {
+      setRefreshing(true);
+      setTimeout(() => {
+        // simulate fetch profile
+        setRefreshing(false);
+      }, 1200);
+    } catch (error) {
+      console.error('Failed to refresh profile:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Profile refresh error details:', {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+      });
+      Alert.alert('Network Error', `Cannot connect to server: ${errorMessage}`);
+    }
   };
 
   // Use 'any' for now so TS won't complain before Expo Router regenerates types for new routes

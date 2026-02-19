@@ -99,15 +99,15 @@ export default function EmployeeDashboard() {
         console.log('Dashboard: User data available:', user);
         console.log('Dashboard: Employee data:', user.employee);
         
-        const rawJoinDate = user?.employee?.date_hired || 'Not specified';
+        const rawJoinDate = String(user?.employee?.date_hired ?? 'Not specified');
         console.log('Raw join date from database:', rawJoinDate);
         
         const newEmployeeData = {
           name: user.employee ? 
             (() => {
-              const firstName = user.employee.first_name || '';
-              const middleName = user.employee.middle_name;
-              const lastName = user.employee.last_name || '';
+              const firstName = String((user.employee as any)?.first_name ?? '');
+              const middleName = String((user.employee as any)?.middle_name ?? '');
+              const lastName = String((user.employee as any)?.last_name ?? '');
               
               let formattedName = firstName;
               
@@ -124,19 +124,19 @@ export default function EmployeeDashboard() {
               return formattedName.trim() || 'Unknown Employee';
             })() :
             user?.user_name || 'Unknown Employee',
-          position: user.employee?.position_name || 'Employee',
-          department: user.employee?.department_name || 'General Department',
+          position: String((user.employee as any)?.position_name ?? 'Employee'),
+          department: String((user.employee as any)?.department_name ?? 'General Department'),
           employeeId: user?.bio_id ? `EMP-${String(user.bio_id).padStart(4, '0')}` : 'EMP-000',
           joinDate: rawJoinDate,
           joinDateFormatted: formatDate(rawJoinDate),
           serviceYears: calculateService(rawJoinDate),
-          status: user.employee?.employment_status_name || 'Active',
+          status: String((user.employee as any)?.employment_status_name ?? 'Active'),
           // Additional data for display
-          email: user.employee?.b_email || 'Not specified',
-          contact: user.employee?.b_cont_no || 'Not specified',
-          address: user.employee?.b_permanent_address || 'Not specified',
-          subDepartment: user.employee?.sub_department_name || 'None',
-          dailyRate: user.employee?.daily_rate ? `₱${user.employee.daily_rate}` : 'Not specified',
+          email: String((user.employee as any)?.b_email ?? 'Not specified'),
+          contact: String((user.employee as any)?.b_cont_no ?? 'Not specified'),
+          address: String((user.employee as any)?.b_permanent_address ?? 'Not specified'),
+          subDepartment: String((user.employee as any)?.sub_department_name ?? 'None'),
+          dailyRate: (user.employee as any)?.daily_rate ? `₱${String((user.employee as any)?.daily_rate)}` : 'Not specified',
         };
         
         console.log('Dashboard: Setting employee data:', newEmployeeData);
