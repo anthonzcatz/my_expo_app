@@ -1,28 +1,22 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
-export default function LoginScreen({ onLoggedIn }) {
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { API_ENDPOINTS } from '@/config/api';
+import { useAuth } from '@/contexts/auth-context';
+
+export default function LoginScreen() {
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showLoading, setShowLoading] = useState(false);
-  const [showAppLoading, setShowAppLoading] = useState(true);
   
   // Animation values
   const [fadeAnim] = useState(new Animated.Value(1));
   const [scaleAnim] = useState(new Animated.Value(1));
   const [slideAnim] = useState(new Animated.Value(0));
-
-  // App loading animation
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowAppLoading(false);
-    }, 3000); // Show loading animation for 3 seconds
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Basic demo: no network hook, keep UI responsive
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -48,8 +42,46 @@ export default function LoginScreen({ onLoggedIn }) {
     ]).start();
     
     try {
-      // Demo success flow without backend for now
-      await new Promise((r) => setTimeout(r, 700));
+      // Use dynamic API configuration
+      const url = API_ENDPOINTS.LOGIN;
+      console.log('Login attempt to URL:', url);
+      console.log('Username:', username);
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      console.log('Login response status:', res.status);
+      const data = await res.json().catch(() => null);
+      console.log('Login response data:', data);
+
+      if (!res.ok || !data?.ok) {
+        const code = data?.error ?? 'LOGIN_FAILED';
+        console.log('Login failed with code:', code);
+        
+        // Fade back in on error
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+        
+        if (code === 'ACCOUNT_DISABLED') {
+          Alert.alert('Account disabled', 'Please contact HR/admin.');
+        } else {
+          Alert.alert('Login failed', 'Invalid username or password.');
+        }
+        return;
+      }
 
       // Success animation - slide up and fade
       Animated.parallel([
@@ -67,12 +99,8 @@ export default function LoginScreen({ onLoggedIn }) {
 
       // Wait for animation to complete before navigation
       setTimeout(async () => {
-        const user = { username };
-        if (typeof onLoggedIn === 'function') {
-          onLoggedIn(user);
-          return;
-        }
-        Alert.alert('Success', `Welcome, ${username}!`);
+        await login(data.user);
+        router.replace('/employee/dashboard');
       }, 500);
       
     } catch (e) {
@@ -100,9 +128,7 @@ export default function LoginScreen({ onLoggedIn }) {
   };
 
   return (
-    <View style={styles.container}>
-      {/* App Loading Animation removed to simplify */}
-      
+    <ThemedView style={styles.container}>
       {/* Logo at the top */}
       <Animated.View style={[
         styles.logoContainer,
@@ -112,9 +138,8 @@ export default function LoginScreen({ onLoggedIn }) {
         }
       ]}>
         <Image 
-          source={require('../assets/images/logo.png')} 
-          style={styles.logo}
-          resizeMode="contain"
+          source={require('@/assets/images/logo.png')} 
+          style={styles.logoImage} 
         />
       </Animated.View>
       
@@ -126,8 +151,8 @@ export default function LoginScreen({ onLoggedIn }) {
           transform: [{ scale: scaleAnim }, { translateY: slideAnim }]
         }
       ]}>
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to continue to your account</Text>
+        <ThemedText style={styles.title}>Welcome Back</ThemedText>
+        <ThemedText style={styles.subtitle}>Sign in to continue to your account</ThemedText>
       </Animated.View>
       
       <Animated.View style={[
@@ -161,35 +186,35 @@ export default function LoginScreen({ onLoggedIn }) {
         </View>
         
         <TouchableOpacity style={styles.forgotPasswordContainer}>
-          <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+          <ThemedText style={styles.forgotPasswordText}>Forgot password?</ThemedText>
         </TouchableOpacity>
         
         <TouchableOpacity style={[styles.button, loading && { opacity: 0.7 }]} disabled={loading} onPress={handleLogin}>
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
+            <ThemedText style={styles.buttonText}>Sign In</ThemedText>
           )}
         </TouchableOpacity>
         
         <View style={styles.dividerContainer}>
           <View style={styles.divider} />
-          <Text style={styles.dividerText}>OR</Text>
+          <ThemedText style={styles.dividerText}>OR</ThemedText>
           <View style={styles.divider} />
         </View>
         
         <TouchableOpacity style={styles.socialButton}>
-          <Text style={styles.socialButtonText}>Continue with Google</Text>
+          <ThemedText style={styles.socialButtonText}>Continue with Google</ThemedText>
         </TouchableOpacity>
         
         <View style={styles.signupContainer}>
-          <Text style={styles.signupText}>Don't have an account? </Text>
+          <ThemedText style={styles.signupText}>Don't have an account? </ThemedText>
           <TouchableOpacity>
-            <Text style={styles.signupLinkText}>Sign Up</Text>
+            <ThemedText style={styles.signupLinkText}>Sign Up</ThemedText>
           </TouchableOpacity>
         </View>
       </Animated.View>
-    </View>
+    </ThemedView>
   );
 }
 
@@ -206,7 +231,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     alignItems: 'center',
   },
-  logo: {
+  logoImage: {
     width: 150,
     height: 150,
     resizeMode: 'contain',
@@ -224,58 +249,68 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    textAlign: 'center',
     color: '#666',
+    textAlign: 'center',
   },
   form: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 350,
   },
   inputContainer: {
     marginBottom: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: 'transparent',
+    color: '#333',
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',
-    marginBottom: 30,
+    marginBottom: 25,
   },
   forgotPasswordText: {
     color: '#007AFF',
     fontSize: 14,
+    fontWeight: '500',
   },
   button: {
     backgroundColor: '#007AFF',
-    padding: 16,
+    paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 20,
+    marginTop: 10,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   buttonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 30,
   },
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: '#ddd',
+    backgroundColor: '#e9ecef',
   },
   dividerText: {
-    marginHorizontal: 16,
-    color: '#666',
+    paddingHorizontal: 15,
+    color: '#999',
     fontSize: 14,
+    fontWeight: '500',
   },
   socialButton: {
     backgroundColor: '#ffffff',
@@ -303,6 +338,6 @@ const styles = StyleSheet.create({
   signupLinkText: {
     color: '#007AFF',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
 });
