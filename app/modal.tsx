@@ -1,9 +1,12 @@
-import { router } from 'expo-router';
-import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { useState } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IMAGE_URLS } from '@/config/api';
+import { useAuth } from '@/contexts/auth-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 function MenuItem({ icon, color, label, onPress }: { icon: any; color: string; label: string; onPress: () => void }) {
   return (
@@ -18,8 +21,53 @@ function MenuItem({ icon, color, label, onPress }: { icon: any; color: string; l
 }
 
 export default function ModalScreen() {
+  const { user } = useAuth();
   const go = (path: string) => router.push(path as any);
   const [loggingOut, setLoggingOut] = useState(false);
+  
+  // Format employee name from database (same as dashboard)
+  const getEmployeeName = () => {
+    if (user?.employee) {
+      const firstName = String((user.employee as any)?.first_name ?? '');
+      const middleName = String((user.employee as any)?.middle_name ?? '');
+      const lastName = String((user.employee as any)?.last_name ?? '');
+      
+      let formattedName = firstName;
+      
+      // Add middle initial with period if middle name exists
+      if (middleName && middleName.trim()) {
+        formattedName += ` ${middleName.trim().charAt(0).toUpperCase()}.`;
+      }
+      
+      // Add last name
+      if (lastName) {
+        formattedName += ` ${lastName}`;
+      }
+      
+      return formattedName.trim() || user?.user_name || 'Unknown Employee';
+    }
+    return user?.user_name || 'Unknown Employee';
+  };
+
+  const getEmployeePosition = () => {
+    return String((user?.employee as any)?.position_name ?? 'Employee');
+  };
+
+  const getEmployeeDepartment = () => {
+    return String((user?.employee as any)?.department_name ?? 'General Department');
+  };
+
+  // Get employee image URL
+  const getEmployeeImageUrl = () => {
+    const userImg = (user?.employee as any)?.user_img;
+    if (userImg) {
+      const imageUrl = `${IMAGE_URLS.USER_IMAGES}/${userImg}`;
+      console.log('Modal: Getting image URL:', imageUrl);
+      return imageUrl;
+    }
+    return undefined;
+  };
+
   const doLogout = async () => {
     setLoggingOut(true);
     try {
@@ -40,6 +88,9 @@ export default function ModalScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Status bar spacer */}
+      <View style={styles.statusBarSpacer} />
+      
       {/* Header */}
       <View style={styles.headerRow}>
         <ThemedText style={styles.headerTitle}>Menu</ThemedText>
@@ -52,11 +103,23 @@ export default function ModalScreen() {
         {/* Profile summary */}
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
-            <Ionicons name="person" size={28} color="#fff" />
+            {getEmployeeImageUrl() ? (
+              <Image
+                source={{ 
+                  uri: `${getEmployeeImageUrl()}?t=${Date.now()}`
+                }}
+                style={styles.avatarImage}
+                contentFit="cover"
+                onError={() => console.log('Modal: Image failed to load')}
+                onLoad={() => console.log('Modal: Image loaded successfully')}
+              />
+            ) : (
+              <Ionicons name="person" size={28} color="#fff" />
+            )}
           </View>
           <View style={{ flex: 1 }}>
-            <ThemedText style={styles.profileName}>John Doe</ThemedText>
-            <ThemedText style={styles.profileMeta}>Senior Developer • IT Department</ThemedText>
+            <ThemedText style={styles.profileName}>{getEmployeeName()}</ThemedText>
+            <ThemedText style={styles.profileMeta}>{getEmployeePosition()} • {getEmployeeDepartment()}</ThemedText>
           </View>
           <TouchableOpacity onPress={() => go('/employee/profile')}>
             <ThemedText style={styles.viewProfile}>View</ThemedText>
@@ -111,6 +174,10 @@ export default function ModalScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
+  statusBarSpacer: {
+    height: 44,
+    backgroundColor: '#FFFFFF',
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -138,6 +205,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
   },
   profileName: { fontSize: 16, fontWeight: '700', color: '#000' },
   profileMeta: { fontSize: 12, color: '#666' },

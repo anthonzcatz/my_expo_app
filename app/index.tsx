@@ -9,9 +9,10 @@ import { API_ENDPOINTS } from '@/config/api';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   
   // Animation values
@@ -19,31 +20,35 @@ export default function LoginScreen() {
   const [scaleAnim] = useState(new Animated.Value(1));
   const [slideAnim] = useState(new Animated.Value(0));
 
+  // Check if user is already logged in and redirect
+  // useEffect(() => {
+  //   const checkAuth = async () => {
+  //     try {
+  //       const stored = await AsyncStorage.getItem('auth_user');
+  //       if (stored) {
+  //         const user = JSON.parse(stored);
+  //         if (user && user.user_id) {
+  //           // User is logged in, redirect to dashboard
+  //           router.replace('/employee/dashboard');
+  //         }
+  //       }
+  //     } catch (e) {
+  //       console.log('No stored auth found');
+  //     }
+  //   };
+  //   
+  //   checkAuth();
+  // }, []);
+
   const handleLogin = async () => {
     if (!username || !password) {
       Alert.alert('Missing details', 'Please enter your username and password.');
       return;
     }
     
-    // Start login animation
     setLoading(true);
     
-    // Fade out and scale down animation
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0.3,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    
     try {
-      // Use dynamic API configuration
       const url = API_ENDPOINTS.LOGIN;
       console.log('Login attempt to URL:', url);
       console.log('Username:', username);
@@ -61,48 +66,21 @@ export default function LoginScreen() {
       if (!res.ok || !data?.ok) {
         const code = data?.error ?? 'LOGIN_FAILED';
         console.log('Login failed with code:', code);
+        setLoading(false);
         
-        // Fade back in on error
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-        
+        console.log('About to show alert for:', code);
         if (code === 'ACCOUNT_DISABLED') {
           Alert.alert('Account disabled', 'Please contact HR/admin.');
+          console.log('Account disabled alert shown');
         } else {
           Alert.alert('Login failed', 'Invalid username or password.');
+          console.log('Login failed alert shown');
         }
         return;
       }
 
-      // Success animation - slide up and fade
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: -50,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      // Wait for animation to complete before navigation
-      setTimeout(async () => {
-        await login(data.user);
-        router.replace('/employee/dashboard');
-      }, 500);
+      await login(data.user);
+      router.replace('/employee/dashboard');
       
     } catch (e) {
       console.error('Login error:', e);
@@ -114,21 +92,10 @@ export default function LoginScreen() {
         username: username
       });
       
-      // Fade back in on error
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-      
+      setLoading(false);
+      console.log('About to show network error alert');
       Alert.alert('Network Error', `Cannot connect to server: ${errorMessage}\n\nURL: ${API_ENDPOINTS.LOGIN}`);
+      console.log('Network error alert shown');
     } finally {
       setLoading(false);
     }
@@ -137,41 +104,25 @@ export default function LoginScreen() {
   return (
     <ThemedView style={styles.container}>
       {/* Logo at the top */}
-      <Animated.View style={[
-        styles.logoContainer,
-        {
-          opacity: fadeAnim,
-          transform: [{ scale: scaleAnim }, { translateY: slideAnim }]
-        }
-      ]}>
+      <View style={styles.logoContainer}>
         <Image
           source={require('../assets/images/logo.png')}
           style={styles.logoImage}
+          contentFit="contain"
         />
-      </Animated.View>
+      </View>
       
       {/* Welcome text below logo */}
-      <Animated.View style={[
-        styles.welcomeContainer,
-        {
-          opacity: fadeAnim,
-          transform: [{ scale: scaleAnim }, { translateY: slideAnim }]
-        }
-      ]}>
+      <View style={styles.welcomeContainer}>
         <ThemedText style={styles.title}>Welcome Back</ThemedText>
         <ThemedText style={styles.subtitle}>Sign in to continue to your account</ThemedText>
-      </Animated.View>
+      </View>
       
-      <Animated.View style={[
-        styles.form,
-        {
-          opacity: fadeAnim,
-          transform: [{ scale: scaleAnim }, { translateY: slideAnim }]
-        }
-      ]}>
+      <View style={styles.form}>
         <View style={styles.inputContainer}>
+          <ThemedText style={styles.inputIcon}>👤</ThemedText>
           <TextInput
-            style={styles.input}
+            style={styles.inputWithIcon}
             placeholder="Username"
             value={username}
             onChangeText={setUsername}
@@ -181,15 +132,27 @@ export default function LoginScreen() {
           />
         </View>
         
-        <View style={styles.inputContainer}>
+        <View key="password-container" style={styles.inputContainer}>
+          <ThemedText style={styles.inputIcon}>🔒</ThemedText>
           <TextInput
-            style={styles.input}
+            style={styles.inputWithIcon}
             placeholder="Password"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
+            secureTextEntry={!showPassword}
             placeholderTextColor="#999"
           />
+          {password.length > 0 ? (
+            <TouchableOpacity 
+              key="eye-icon"
+              style={styles.eyeIcon} 
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <ThemedText style={styles.eyeIconText}>
+                {showPassword ? "🙈" : "👁️"}
+              </ThemedText>
+            </TouchableOpacity>
+          ) : null}
         </View>
         
         <TouchableOpacity style={styles.forgotPasswordContainer}>
@@ -220,7 +183,7 @@ export default function LoginScreen() {
             <ThemedText style={styles.signupLinkText}>Sign Up</ThemedText>
           </TouchableOpacity>
         </View>
-      </Animated.View>
+      </View>
     </ThemedView>
   );
 }
@@ -241,7 +204,6 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 150,
     height: 150,
-    resizeMode: 'contain',
   },
   welcomeContainer: {
     alignItems: 'center',
@@ -269,6 +231,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e9ecef',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   input: {
     paddingHorizontal: 16,
@@ -276,6 +240,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: 'transparent',
     color: '#333',
+  },
+  inputWithIcon: {
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 14,
+    fontSize: 16,
+    backgroundColor: 'transparent',
+    color: '#333',
+  },
+  inputIcon: {
+    fontSize: 20,
+    marginLeft: 16,
+    marginRight: 8,
+    color: '#999',
+  },
+  eyeIcon: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  eyeIconText: {
+    fontSize: 18,
+    color: '#999',
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',

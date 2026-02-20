@@ -1,10 +1,11 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+import AuthGuard from '../auth-guard';
 
 export default function EmployeeLayout() {
   return (
-    <Tabs
+    <AuthGuard>
+      <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#007AFF',
         tabBarInactiveTintColor: '#8E8E93',
@@ -24,7 +25,8 @@ export default function EmployeeLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Home',
+          title: '',
+          headerShown: false,
           tabBarIcon: ({ focused, color }) => (
             <Ionicons 
               name={focused ? 'home' : 'home-outline'} 
@@ -77,9 +79,7 @@ export default function EmployeeLayout() {
       {/* Hide non-tab routes from the tab bar */}
       <Tabs.Screen name="leave/apply" options={{ href: null }} />
       <Tabs.Screen name="memos" options={{ href: null }} />
-      <Tabs.Screen name="incidents" options={{ href: null }} />
-      <Tabs.Screen name="awards" options={{ href: null }} />
-      <Tabs.Screen name="promotions" options={{ href: null }} />
     </Tabs>
+    </AuthGuard>
   );
 }

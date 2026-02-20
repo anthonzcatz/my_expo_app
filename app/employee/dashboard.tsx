@@ -1,11 +1,12 @@
 import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IMAGE_URLS } from '@/config/api';
 import { useAuth } from '@/contexts/auth-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function EmployeeDashboard() {
@@ -81,7 +82,11 @@ export default function EmployeeDashboard() {
     address: 'Not specified',
     subDepartment: 'None',
     dailyRate: 'Not specified',
+    user_img: '', // Add user_img field for real-time updates
   });
+
+  // State for forcing re-render when image updates
+  const [imageUpdateTrigger, setImageUpdateTrigger] = useState(0);
 
   useEffect(() => {
     // Only initialize when auth context is done loading
@@ -137,6 +142,7 @@ export default function EmployeeDashboard() {
           address: String((user.employee as any)?.b_permanent_address ?? 'Not specified'),
           subDepartment: String((user.employee as any)?.sub_department_name ?? 'None'),
           dailyRate: (user.employee as any)?.daily_rate ? `₱${String((user.employee as any)?.daily_rate)}` : 'Not specified',
+          user_img: String((user.employee as any)?.user_img ?? ''), // Add user_img from auth context
         };
         
         console.log('Dashboard: Setting employee data:', newEmployeeData);
@@ -176,6 +182,14 @@ export default function EmployeeDashboard() {
     { id: 4, title: 'Training Completed', description: 'React Native Advanced Course', date: '1 month ago', status: 'completed' },
   ]);
 
+  const handleMenuPress = () => {
+    router.push('/modal');
+  };
+
+  const handleNavigate = (screen: any) => {
+    router.push(screen);
+  };
+
   const handleLogout = async () => {
     Alert.alert(
       'Logout',
@@ -186,8 +200,12 @@ export default function EmployeeDashboard() {
           text: 'Logout', 
           style: 'destructive',
           onPress: async () => {
-            await logout();
-            router.replace('/');
+            try {
+              await logout();
+              router.replace('/');
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
           }
         }
       ]
@@ -198,14 +216,6 @@ export default function EmployeeDashboard() {
     setRefreshing(true);
     setTimeout(() => {
       // Simulate data refresh but maintain the same data format
-      setEmployeeData(prev => {
-        const updatedData = { ...prev };
-        // Just refresh the service calculation in case date changed
-        if (prev.joinDate !== 'Not specified') {
-          updatedData.serviceYears = calculateService(prev.joinDate);
-        }
-        return updatedData;
-      });
       setStats(prev => prev.map(stat => ({
         ...stat,
         value: Math.floor(Math.random() * 20) + ' days'
@@ -213,6 +223,43 @@ export default function EmployeeDashboard() {
       setRefreshing(false);
     }, 2000);
   };
+
+  // Get employee image URL
+  const getEmployeeImageUrl = () => {
+    // Check both employeeData state and auth context for real-time updates
+    const userImg = employeeData.user_img || (user?.employee as any)?.user_img;
+    if (userImg) {
+      const imageUrl = `${IMAGE_URLS.USER_IMAGES}/${userImg}`;
+      console.log('Dashboard: Getting image URL:', imageUrl, 'update trigger:', imageUpdateTrigger);
+      return imageUrl;
+    }
+    return undefined;
+  };
+
+  // Listen for global image updates from profile
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Check if global image update happened
+      const lastUpdate = localStorage.getItem('globalImageUpdate');
+      if (lastUpdate) {
+        console.log('Dashboard: Detected global image update, refreshing data...');
+        
+        // Refresh employee data from auth context
+        if (user?.employee) {
+          const updatedUserImg = String((user.employee as any)?.user_img ?? '');
+          setEmployeeData(prev => ({ ...prev, user_img: updatedUserImg }));
+        }
+        
+        // Force re-render by updating image trigger
+        setImageUpdateTrigger(Date.now());
+        
+        localStorage.removeItem('globalImageUpdate');
+        console.log('Dashboard: Image update processed');
+      }
+    }, 500); // Check every 500ms for faster updates
+
+    return () => clearInterval(interval);
+  }, [user]);
 
   const StatCard = ({ item }: { item: any }) => (
     <TouchableOpacity style={[styles.statCard, { borderLeftColor: item.color }]}>
@@ -285,12 +332,13 @@ export default function EmployeeDashboard() {
   );
 
   return (
-    <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
+    <ThemedView style={styles.container}>
       <AppHeader 
         title="Employee Portal" 
         subtitle="Dashboard" 
         showLogout={true}
         onLogout={handleLogout}
+        onMenuPress={handleMenuPress}
       />
       
       {loading ? (
@@ -309,37 +357,51 @@ export default function EmployeeDashboard() {
         <View style={styles.employeeCard}>
           <View style={styles.employeeHeader}>
             <View style={styles.avatar}>
-              <Ionicons name="person" size={40} color="#FFFFFF" />
+              {getEmployeeImageUrl() ? (
+                <Image
+                  source={{ 
+                    uri: `${getEmployeeImageUrl()}?t=${imageUpdateTrigger}`
+                  }}
+                  style={styles.avatarImage}
+                  onError={() => console.log('Dashboard: Image failed to load')}
+                  onLoad={() => console.log('Dashboard: Image loaded successfully')}
+                />
+              ) : (
+                <Ionicons name="person" size={28} color="#FFFFFF" />
+              )}
             </View>
             <View style={styles.employeeInfo}>
               <ThemedText style={styles.employeeName}>{employeeData.name}</ThemedText>
-              <ThemedText style={styles.employeePosition}>{employeeData.position}</ThemedText>
-              <View style={styles.departmentRow}>
-                <ThemedText style={styles.employeeDepartment}>{employeeData.department}</ThemedText>
-                {employeeData.subDepartment && employeeData.subDepartment !== 'None' && (
-                  <>
-                    <ThemedText style={styles.departmentSeparator}> / </ThemedText>
-                    <ThemedText style={styles.employeeSubDepartment}>{employeeData.subDepartment}</ThemedText>
-                  </>
-                )}
+              <ThemedText style={styles.employeePosition}>{employeeData.position} • {employeeData.department}</ThemedText>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/employee/profile')}>
+              <ThemedText style={styles.viewProfile}>View</ThemedText>
+            </TouchableOpacity>
+          </View>
+          
+          {/* Compact Details */}
+          <View style={styles.compactDetails}>
+            <View style={styles.detailRow}>
+              <View style={styles.detailItem}>
+                <ThemedText style={styles.detailLabel}>ID</ThemedText>
+                <ThemedText style={styles.detailValue}>{employeeData.employeeId}</ThemedText>
+              </View>
+              <View style={styles.detailItem}>
+                <ThemedText style={styles.detailLabel}>Status</ThemedText>
+                <View style={styles.statusBadge}>
+                  <ThemedText style={styles.statusText}>{employeeData.status}</ThemedText>
+                </View>
               </View>
             </View>
-            <View style={styles.statusBadge}>
-              <ThemedText style={styles.statusText}>{employeeData.status}</ThemedText>
-            </View>
-          </View>
-          <View style={styles.employeeDetails}>
-            <View style={styles.detailItem}>
-              <ThemedText style={styles.detailLabel}>Employee ID:</ThemedText>
-              <ThemedText style={styles.detailValue}>{employeeData.employeeId}</ThemedText>
-            </View>
-            <View style={styles.detailItem}>
-              <ThemedText style={styles.detailLabel}>Join Date:</ThemedText>
-              <ThemedText style={styles.detailValue}>{employeeData.joinDateFormatted}</ThemedText>
-            </View>
-            <View style={styles.detailItem}>
-              <ThemedText style={styles.detailLabel}>Service:</ThemedText>
-              <ThemedText style={styles.detailValue}>{employeeData.serviceYears}</ThemedText>
+            <View style={styles.detailRow}>
+              <View style={styles.detailItem}>
+                <ThemedText style={styles.detailLabel}>Joined</ThemedText>
+                <ThemedText style={styles.detailValue}>{employeeData.joinDateFormatted}</ThemedText>
+              </View>
+              <View style={styles.detailItem}>
+                <ThemedText style={styles.detailLabel}>Service</ThemedText>
+                <ThemedText style={styles.detailValue}>{employeeData.serviceYears}</ThemedText>
+              </View>
             </View>
           </View>
         </View>
@@ -400,7 +462,7 @@ export default function EmployeeDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F5F7FA',
   },
   scrollView: {
     flex: 1,
@@ -408,104 +470,95 @@ const styles = StyleSheet.create({
   employeeCard: {
     backgroundColor: '#FFFFFF',
     margin: 16,
-    padding: 20,
+    padding: 16,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.04,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
+    // For web compatibility
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.04)',
   },
   employeeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    gap: 12,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#007AFF',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
   },
   employeeInfo: {
     flex: 1,
   },
   employeeName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#000000',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+    color: '#1A1A1A',
   },
   employeePosition: {
+    fontSize: 12,
+    color: '#666',
+  },
+  viewProfile: {
+    color: '#007AFF',
+    fontWeight: '600',
     fontSize: 14,
-    opacity: 0.8,
-    marginBottom: 2,
-    color: '#000000',
   },
-  employeeDepartment: {
-    fontSize: 12,
-    opacity: 0.6,
-    color: '#000000',
+  compactDetails: {
+    gap: 8,
   },
-  departmentRow: {
+  detailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 16,
   },
-  departmentSeparator: {
-    fontSize: 12,
-    opacity: 0.4,
-    color: '#000000',
-    marginHorizontal: 4,
+  detailItem: {
+    flex: 1,
+    alignItems: 'flex-start',
   },
-  employeeSubDepartment: {
+  detailLabel: {
     fontSize: 11,
-    opacity: 0.5,
-    color: '#000000',
-    fontStyle: 'italic',
+    color: '#666',
+    marginBottom: 2,
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1A1A1A',
   },
   statusBadge: {
     backgroundColor: '#34C759',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
   statusText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
-  },
-  employeeDetails: {
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
-    paddingTop: 16,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  detailLabel: {
-    fontSize: 14,
-    opacity: 0.7,
-    color: '#000000',
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
   },
   statsContainer: {
     margin: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#000000',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 20,
+    color: '#1A1A1A',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -515,29 +568,33 @@ const styles = StyleSheet.create({
   statCard: {
     width: '48%',
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+    // For web compatibility
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.04)',
+    alignItems: 'center',
   },
   statIcon: {
-    marginBottom: 8,
+    marginBottom: 12,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#000000',
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 6,
+    color: '#1A1A1A',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 13,
     opacity: 0.7,
-    color: '#000000',
+    color: '#6B7280',
+    textAlign: 'center',
   },
   activitiesContainer: {
     margin: 16,
@@ -550,51 +607,97 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     color: '#007AFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
   activitiesList: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+    // For web compatibility
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.04)',
   },
   activityItem: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: '#F3F4F6',
   },
   activityIcon: {
-    marginRight: 12,
+    marginRight: 16,
     marginTop: 2,
   },
   activityContent: {
     flex: 1,
   },
   activityTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
-    color: '#000000',
+    color: '#1A1A1A',
   },
   activityDescription: {
-    fontSize: 12,
-    opacity: 0.7,
+    fontSize: 14,
+    color: '#6B7280',
     marginBottom: 4,
-    color: '#000000',
   },
   activityDate: {
-    fontSize: 11,
-    opacity: 0.5,
-    color: '#000000',
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  announcementsContainer: {
+    margin: 16,
+  },
+  announcementItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+    // For web compatibility
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.04)',
+  },
+  announcementContent: {
+    flex: 1,
+  },
+  announcementTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 6,
+    color: '#1A1A1A',
+  },
+  announcementMessage: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+  announcementDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  priorityText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
   },
   quickActionsContainer: {
     margin: 16,
-    marginBottom: 32,
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -604,20 +707,22 @@ const styles = StyleSheet.create({
   quickActionButton: {
     width: '48%',
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     alignItems: 'center',
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
+    // For web compatibility
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.04)',
   },
   quickActionText: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: '500',
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: '600',
     color: '#007AFF',
     textAlign: 'center',
   },
@@ -625,74 +730,43 @@ const styles = StyleSheet.create({
   notificationItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+    // For web compatibility
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.04)',
   },
   notificationIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   notificationContent: {
     flex: 1,
   },
   notificationTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#000000',
-    marginBottom: 2,
+    marginBottom: 4,
+    color: '#1A1A1A',
   },
   notificationMessage: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 4,
   },
   notificationTime: {
-    fontSize: 10,
-    color: '#999',
-  },
-  // Announcement styles
-  announcementItem: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  announcementContent: {
-    flex: 1,
-  },
-  announcementTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  announcementMessage: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-  },
-  announcementDate: {
-    fontSize: 10,
-    color: '#999',
-  },
-  priorityBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  priorityText: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: '600',
+    fontSize: 11,
+    color: '#9CA3AF',
   },
   loadingContainer: {
     flex: 1,
@@ -701,8 +775,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: '#6B7280',
   },
 });

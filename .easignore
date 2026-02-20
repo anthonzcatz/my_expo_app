@@ -1,0 +1,14 @@
+# Ignore common development files
+node_modules/
+.expo/
+dist/
+web-build/
+.git/
+*.log
+*.tgz
+.DS_Store
+.vscode/
+.idea/
+# Ignore large asset files
+assets/videos/
+assets/audio/
