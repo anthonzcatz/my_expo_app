@@ -12,10 +12,10 @@ function MenuItem({ icon, color, label, onPress }: { icon: any; color: string; l
   return (
     <TouchableOpacity accessibilityRole="button" onPress={onPress} style={styles.menuItem}>
       <View style={[styles.menuIconWrap, { backgroundColor: `${color}15` }]}> 
-        <Ionicons name={icon} size={20} color={color} />
+        <Ionicons name={icon as any} size={20} color={color} />
       </View>
       <ThemedText style={styles.menuLabel}>{label}</ThemedText>
-      <Ionicons name="chevron-forward" size={18} color="#999" />
+      <Ionicons name={"chevron-forward"} size={18} color="#999" />
     </TouchableOpacity>
   );
 }
@@ -95,7 +95,7 @@ export default function ModalScreen() {
       <View style={styles.headerRow}>
         <ThemedText style={styles.headerTitle}>Menu</ThemedText>
         <TouchableOpacity accessibilityLabel="Close" onPress={() => router.back()} style={styles.closeBtn}>
-          <Ionicons name="close" size={24} color="#1A1A1A" />
+          <Ionicons name={"close" as any} size={24} color="#1A1A1A" />
         </TouchableOpacity>
       </View>
 
@@ -114,7 +114,7 @@ export default function ModalScreen() {
                 onLoad={() => console.log('Modal: Image loaded successfully')}
               />
             ) : (
-              <Ionicons name="person" size={28} color="#fff" />
+              <Ionicons name={"person" as any} size={28} color="#fff" />
             )}
           </View>
           <View style={{ flex: 1 }}>
@@ -157,7 +157,7 @@ export default function ModalScreen() {
             <ActivityIndicator color="#FF3B30" />
           ) : (
             <>
-              <Ionicons name="log-out-outline" size={20} color="#FF3B30" />
+              <Ionicons name={"log-out-outline" as any} size={20} color="#FF3B30" />
               <ThemedText style={styles.logoutText}>Logout</ThemedText>
             </>
           )}
